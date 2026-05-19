@@ -1,29 +1,36 @@
 # Build the Frontend
-FROM node:latest AS frontend-build 
+FROM node:25-alpine3.22 AS frontend-build 
+
+WORKDIR /app/frontend
+
+COPY frontend/package.json frontend/package-lock.json ./ 
+RUN npm ci
+COPY frontend/ ./ 
+RUN npm run build .
+
+#Build the Backend 
+FROM golang:1.26.2-alpine3.23 AS backend-build
+RUN apk add --no-cache tzdata
+RUN apk add --no-cache make 
 
 WORKDIR /app
 
-COPY ./package.json /app/package.json
-RUN npm install --legacy-peer-deps
-COPY . .
-RUN npm run build-only
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
 
-# Initialize Nginx
-FROM nginx AS nginx-build
-COPY ./nginx.conf /etc/nginx/conf.d/default.conf
+COPY backend/ ./
+COPY --from=frontend-build /app/frontend/dist ./ui/dist/
+RUN make build 
 
-# Copy the app build to nginx
-COPY --from=frontend-build /app/dist /usr/share/nginx/html 
+# Create the runtime
+FROM alpine:3.22.4
+RUN apk add --no-cache ca-certificates
+WORKDIR /app
 
-EXPOSE 80
+COPY --from=backend-build /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=backend-build /app/bin/gainsmith /app/gainsmith
 
-ARG PB_VERSION=0.36.2
-RUN apt update && apt install unzip
-# download and unzip PocketBase
-ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
-RUN unzip /tmp/pb.zip -d /pb/
+EXPOSE 8090
 
-COPY ./entrypoint.sh /
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT [ "./entrypoint.sh" ]
+ENTRYPOINT [ "/app/gainsmith" ]
+CMD ["serve", "--http=0.0.0.0:8090"]

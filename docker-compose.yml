@@ -1,11 +1,12 @@
 services:
   gainsmith:
+    image: gloof11/gainsmith
     restart: unless-stopped
-    build:
-      context: .
-      dockerfile: Dockerfile
+    container_name: gainsmith
     ports:
-      - '80:80'
+      - '8090:8090'
+    environment:
+      - SUPERUSER=${SUPERUSER:?SUPERUSER is required}
+      - SUPERUSER_PASSWORD=${SUPERUSER_PASSWORD:?SUPERUSER_PASSWORD is required}
     volumes:
-      - ./pb/pb_data:/pb/pb_data
-      - ./pb/pb_migrations:/pb/pb_migrations
+      - ./pb_data:/app/pb_data

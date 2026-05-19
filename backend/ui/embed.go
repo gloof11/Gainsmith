@@ -1,0 +1,12 @@
+package ui
+
+import (
+	"embed"
+	"io/fs"
+)
+
+//go:embed all:dist
+var distDir embed.FS
+
+// Embed the frontend to be served
+var DistDirFS, _ = fs.Sub(distDir, "dist")
